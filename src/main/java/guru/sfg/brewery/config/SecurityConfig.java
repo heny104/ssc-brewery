@@ -11,6 +11,7 @@ import org.springframework.data.domain.ExampleMatcher;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
@@ -33,31 +34,36 @@ import javax.naming.ldap.LdapContext;
 
 @Configuration
 @EnableWebSecurity
+// 메소드별 권한 체크 - 대상 메소드에 @Secured({"ROLE_ADMIN", "ROLE_CUSTOMER"}) 추가
+// @prePostEnabled = true => @preAuthorize, @postAuthorize 어노테이션을 사용해서 메소드에 대한 접근 제어 가능
+// 대상 메소드에 @PreAuthorize("hasRole('ADMIN')") 추가
+//@EnableGlobalMethodSecurity(securedEnabled = true, prePostEnabled = true)
+@EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     // 헤더 권한 부여 필터
-    public RestHeaderAuthFilter restHeaderAuthFilter(AuthenticationManager authenticationManager) {
-        RestHeaderAuthFilter filter = new RestHeaderAuthFilter(new AntPathRequestMatcher("/api/**"));
-        filter.setAuthenticationManager(authenticationManager);
-        return filter;
-    }
-
-    public RestUrlAuthFilter restUrlAuthFilter(AuthenticationManager authenticationManager){
-        RestUrlAuthFilter filter = new RestUrlAuthFilter(new AntPathRequestMatcher("/api/**"));
-        filter.setAuthenticationManager(authenticationManager);
-        return filter;
-    }
+//    public RestHeaderAuthFilter restHeaderAuthFilter(AuthenticationManager authenticationManager) {
+//        RestHeaderAuthFilter filter = new RestHeaderAuthFilter(new AntPathRequestMatcher("/api/**"));
+//        filter.setAuthenticationManager(authenticationManager);
+//        return filter;
+//    }
+//
+//    public RestUrlAuthFilter restUrlAuthFilter(AuthenticationManager authenticationManager){
+//        RestUrlAuthFilter filter = new RestUrlAuthFilter(new AntPathRequestMatcher("/api/**"));
+//        filter.setAuthenticationManager(authenticationManager);
+//        return filter;
+//    }
 
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         // Spring Security에 필터 추가
         // 필터 체인에 사용자 이름 및 비밀번호 인증 필터 전에 실행할 필터를 추가
-        http.addFilterBefore(restHeaderAuthFilter(authenticationManager()),
-                UsernamePasswordAuthenticationFilter.class)
-                .csrf().disable();
-
-        http.addFilterBefore(restUrlAuthFilter(authenticationManager()),
-                UsernamePasswordAuthenticationFilter.class);
+//        http.addFilterBefore(restHeaderAuthFilter(authenticationManager()),
+//                UsernamePasswordAuthenticationFilter.class)
+//                .csrf().disable();
+//
+//        http.addFilterBefore(restUrlAuthFilter(authenticationManager()),
+//                UsernamePasswordAuthenticationFilter.class);
 
         http
                 .authorizeRequests(authorize -> {
@@ -67,17 +73,41 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                             // antMatchers - 특정 리소스에 대해서 권한을 설정
                             // permitAll - antMatchers 설정한 리소스의 접근을 인증절차 없이 허용
                             .antMatchers("/","/webjars/**", "/login", "/resources/**").permitAll()
-                            .antMatchers("/beers/find", "/beers*").permitAll()
-                            .antMatchers(HttpMethod.GET, "/api/v1/beer/**").permitAll()
+                            //.antMatchers("/beers/find", "/beers*").permitAll()
+//                            .antMatchers("/beers/find", "/beers*").
+//                                hasAnyRole("ADMIN", "CUSTOMER", "USER")
+//                            .antMatchers(HttpMethod.GET, "/api/v1/beer/**")
+//                                .hasAnyRole("ADMIN", "CUSTOMER", "USER")
+
+                            // ROLE 지정 antMatchers or mvcMatchers 사용
+                            // hasRole() 롤 하나일때, hasAnyRole 롤이 하나 이상일때
+
+                            // @preAuthorize로 대체
+                            //.antMatchers(HttpMethod.DELETE, "/api/v1/beer/**").hasRole("ADMIN")
+
+                            //.mvcMatchers("/brewery/breweries").hasRole("CUSTOMER")
+//                            .mvcMatchers("/brewery/breweries").hasAnyRole("ADMIN", "CUSTOMER")
+                            //.mvcMatchers(HttpMethod.GET, "/brewery/api/v1/breweries").hasRole("CUSTOMER")
+//                            .mvcMatchers(HttpMethod.GET, "/brewery/api/v1/breweries").hasAnyRole("ADMIN", "CUSTOMER")
+
                             // antMatchers 대신 Spring MVC Matcher를 사용하는 모습
-                            .mvcMatchers(HttpMethod.GET, "/api/v1/beerUpc/{upc}").permitAll();
+//                            .mvcMatchers(HttpMethod.GET, "/api/v1/beerUpc/{upc}").
+//                                //permitAll();
+//                                hasAnyRole("ADMIN", "CUSTOMER", "USER")
+//                            .mvcMatchers("/beers/find", "/beers/{beerId}")
+//                                .hasAnyRole("ADMIN", "CUSTOMER", "USER");
+                            ;
                 })
                 .authorizeRequests((requests) -> {
                     // requests.anyRequest()).authenticated() - 모든 리소스를 의미하며 접근허용 리소스 및 인증후 특정 레벨의 권한을 가진 사용자만 접근가능한 리소스를 설정하고 그외 나머지 리소스들은 무조건 인증을 완료해야 접근이 가능
                     ((ExpressionUrlAuthorizationConfigurer.AuthorizedUrl)requests.anyRequest()).authenticated();
                 });
-        http.formLogin();
-        http.httpBasic();
+        http.
+                formLogin()
+                .and()
+                .httpBasic()
+                .and()
+                .csrf().disable();
 
         // h2 console config - iframe 사용시 sameOrigin() 문제 발생
         http.headers().frameOptions().sameOrigin();

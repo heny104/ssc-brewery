@@ -66,6 +66,19 @@ public class BeerOrderServiceImpl implements BeerOrderService {
         }
     }
 
+    @Override
+    public BeerOrderPagedList listOrders(Pageable pageable) {
+        Page<BeerOrder> beerOrderPage = beerOrderRepository.findAll(pageable);
+
+        return new BeerOrderPagedList(beerOrderPage
+                .stream()
+                .map(beerOrderMapper::beerOrderToDto)
+                .collect(Collectors.toList()), PageRequest.of(
+                beerOrderPage.getPageable().getPageNumber(),
+                beerOrderPage.getPageable().getPageSize()),
+                beerOrderPage.getTotalElements());
+    }
+
     @Transactional
     @Override
     public BeerOrderDto placeOrder(UUID customerId, BeerOrderDto beerOrderDto) {
@@ -77,7 +90,10 @@ public class BeerOrderServiceImpl implements BeerOrderService {
             beerOrder.setCustomer(customerOptional.get());
             beerOrder.setOrderStatus(OrderStatusEnum.NEW);
 
-            beerOrder.getBeerOrderLines().forEach(line -> line.setBeerOrder(beerOrder));
+            //beerOrder.getBeerOrderLines().forEach(line -> line.setBeerOrder(beerOrder));
+            if (beerOrder != null && beerOrder.getBeerOrderLines() != null) {
+                beerOrder.getBeerOrderLines().forEach(line -> line.setBeerOrder(beerOrder));
+            }
 
             BeerOrder savedBeerOrder = beerOrderRepository.saveAndFlush(beerOrder);
 
