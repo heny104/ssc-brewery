@@ -1,6 +1,7 @@
 package guru.sfg.brewery.config;
 
 import guru.sfg.brewery.security.SfgPasswordEncoderFactories;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
@@ -8,9 +9,13 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.annotation.web.configurers.ExpressionUrlAuthorizationConfigurer;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.data.repository.query.SecurityEvaluationContextExtension;
+import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
+@RequiredArgsConstructor
 @Configuration
 @EnableWebSecurity
 // 메소드별 권한 체크 - 대상 메소드에 @Secured({"ROLE_ADMIN", "ROLE_CUSTOMER"}) 추가
@@ -19,6 +24,9 @@ import org.springframework.security.data.repository.query.SecurityEvaluationCont
 //@EnableGlobalMethodSecurity(securedEnabled = true, prePostEnabled = true)
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    private final UserDetailsService userDetailsService;
+    private final PersistentTokenRepository persistentTokenRepository;
 
     // spring data jpa 사용할때 필요
     @Bean
@@ -87,12 +95,38 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                     // requests.anyRequest()).authenticated() - 모든 리소스를 의미하며 접근허용 리소스 및 인증후 특정 레벨의 권한을 가진 사용자만 접근가능한 리소스를 설정하고 그외 나머지 리소스들은 무조건 인증을 완료해야 접근이 가능
                     ((ExpressionUrlAuthorizationConfigurer.AuthorizedUrl)requests.anyRequest()).authenticated();
                 });
+
         http.
-                formLogin()
-                .and()
+                formLogin(loginConfigurer -> {
+                    loginConfigurer
+                            .loginProcessingUrl("/login")
+                            .loginPage("/").permitAll()
+                            .successForwardUrl("/")
+                            .defaultSuccessUrl("/")
+                            .failureUrl("/?error"); // 화면에 index.html에 param.error로 변수표시
+                })
+                .logout(logoutConfigurer -> {
+                    logoutConfigurer
+                            .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))
+                            //.logoutSuccessUrl("/")
+                            .logoutSuccessUrl("/?logout")   // 화면에 index.html에 param.logout로 변수표시
+                            .permitAll();
+                })
                 .httpBasic()
                 .and()
-                .csrf().disable();
+                .csrf().ignoringAntMatchers("/h2-console/**", "/api/**")
+                //.csrf().disable();
+                .and()
+
+                        .rememberMe()
+                        // db로 토큰정보 관리할때, login, logout시 토큰 저장, 삭제 spring security에서 자동으로 관리
+                        .tokenRepository(persistentTokenRepository)
+                        .userDetailsService(userDetailsService);
+
+                // remember-me cookie에서 로그인 정보를 기억함
+//                .rememberMe()
+//                    .key("sfg-key")
+//                    .userDetailsService(userDetailsService);
 
         // h2 console config - iframe 사용시 sameOrigin() 문제 발생
         http.headers().frameOptions().sameOrigin();
