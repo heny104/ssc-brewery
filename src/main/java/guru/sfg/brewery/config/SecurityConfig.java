@@ -1,6 +1,7 @@
 package guru.sfg.brewery.config;
 
 import guru.sfg.brewery.security.SfgPasswordEncoderFactories;
+import guru.sfg.brewery.security.google.Google2faFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.data.repository.query.SecurityEvaluationContextExtension;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository;
+import org.springframework.security.web.session.SessionManagementFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @RequiredArgsConstructor
@@ -27,6 +29,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     private final UserDetailsService userDetailsService;
     private final PersistentTokenRepository persistentTokenRepository;
+    private final Google2faFilter google2faFilter;
 
     // spring data jpa 사용할때 필요
     @Bean
@@ -58,7 +61,10 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 //        http.addFilterBefore(restUrlAuthFilter(authenticationManager()),
 //                UsernamePasswordAuthenticationFilter.class);
 
+        http.addFilterBefore(google2faFilter, SessionManagementFilter.class);
+
         http
+                .cors().and()
                 .authorizeRequests(authorize -> {
                     authorize
                             // h2 db console에 접근, production에서는 사용 금지
@@ -130,22 +136,6 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
         // h2 console config - iframe 사용시 sameOrigin() 문제 발생
         http.headers().frameOptions().sameOrigin();
-    }
-
-    // password encoder의 형식 기본 구현
-    @Bean
-    PasswordEncoder passwordEncoder() {
-        //return NoOpPasswordEncoder.getInstance(); // noop
-        //return new LdapShaPasswordEncoder();      // Ldap
-        //return new StandardPasswordEncoder();     // SHA256
-        //return new BCryptPasswordEncoder();         // Bcrypt
-
-        // spring framework5의 새로운 기능
-        // DelegatingPasswordEncoder()
-        //return PasswordEncoderFactories.createDelegatingPasswordEncoder();
-
-        // customizing된 createDelegatingPasswordEncoder
-        return SfgPasswordEncoderFactories.createDelegatingPasswordEncoder();
     }
 
     // 초기방법

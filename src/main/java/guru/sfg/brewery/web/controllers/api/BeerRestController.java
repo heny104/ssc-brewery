@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@CrossOrigin    // crossorigin은 모든 method 가능
 @Slf4j
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/")
@@ -125,6 +126,7 @@ public class BeerRestController {
 
         return new ResponseEntity<>(HttpStatus.NO_CONTENT);
     }
+
 
     @BeerDeletePermission
 //    @PreAuthorize("hasAuthority('beer.delete')")
